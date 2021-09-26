@@ -1,0 +1,92 @@
+[
+  {
+    "deviceId": "a123",
+    "timestamp": "2021-09-25T11:33:09Z",
+    "telemetry": [
+      {
+        "tagId": "a123-j1",
+        "tagValue": -31.149018
+      },
+      {
+        "tagId": "a123-j2",
+        "tagValue": 20.560796
+      },
+      {
+        "tagId": "a123-j3",
+        "tagValue": 13.549235
+      },
+      {
+        "tagId": "a123-j4",
+        "tagValue": -199.356871
+      },
+      {
+        "tagId": "a123-j5",
+        "tagValue": 33.540912
+      },
+      {
+        "tagId": "a123-j6",
+        "tagValue": 65.081923
+      }
+    ]
+  },
+  {
+    "deviceId": "a123",
+    "timestamp": "2021-09-25T11:33:10Z",
+    "telemetry": [
+    {
+      "tagId": "a123-j1",
+      "tagValue": -32.149018
+    },
+    {
+      "tagId": "a123-j2",
+      "tagValue": 19.560796
+    },
+    {
+      "tagId": "a123-j3",
+      "tagValue": 14.549235
+    },
+    {
+      "tagId": "a123-j4",
+      "tagValue": -200.356871
+    },
+    {
+      "tagId": "a123-j5",
+      "tagValue": 32.540912
+    },
+    {
+      "tagId": "a123-j6",
+      "tagValue": 66.081923
+    }
+    ]
+  },
+  {
+    "deviceId": "a123",
+    "timestamp": "2021-09-25T11:33:11Z",
+    "telemetry": [
+      {
+        "tagId": "a123-j1",
+        "tagValue": -31.149018
+      },
+      {
+        "tagId": "a123-j2",
+        "tagValue": 20.560796
+      },
+      {
+        "tagId": "a123-j3",
+        "tagValue": 13.549235
+      },
+      {
+        "tagId": "a123-j4",
+        "tagValue": -199.356871
+      },
+      {
+        "tagId": "a123-j5",
+        "tagValue": 33.540912
+      },
+      {
+        "tagId": "a123-j6",
+        "tagValue": 65.081923
+      }
+    ]
+  }
+]

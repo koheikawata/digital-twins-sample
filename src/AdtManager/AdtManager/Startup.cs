@@ -1,7 +1,10 @@
+using AdtManager.Interfaces;
+using AdtManager.Services;
 using Azure.DigitalTwins.Core;
 using Azure.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Azure.Devices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,6 +27,10 @@ namespace AdtManager
         {
             services.AddSingleton<DigitalTwinsClient>(InitializeDigitalTwinsClient(this.Configuration));
             services.AddSingleton<BasicDigitalTwin>();
+            services.AddScoped<RegistryManager>(sp =>
+                RegistryManager.CreateFromConnectionString(this.Configuration.GetValue<string>("IotHub:IotHubConnectionString"))
+            );
+            services.AddScoped<IIothubService, IothubService>();
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {

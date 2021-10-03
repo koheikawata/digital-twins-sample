@@ -1,130 +1,133 @@
 ﻿using AdtManager.Models;
 using Azure;
 using Azure.DigitalTwins.Core;
-using Azure.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
-
 
 namespace AdtManager.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
     public class AdtController : ControllerBase
     {
         private readonly IConfiguration configuration;
-        
-        public AdtController(IConfiguration configuration)
+        private readonly DigitalTwinsClient digitalTwinsClient;
+        private readonly BasicDigitalTwin basicDigitalTwin;
+
+        private const string twinDisplayName = "SampleDevice";
+        private const string twinId = "SampleTwin";
+
+        public AdtController(IConfiguration configuration, DigitalTwinsClient digitalTwinsClient, BasicDigitalTwin basicDigitalTwin)
         {
             this.configuration = configuration;
+            this.digitalTwinsClient = digitalTwinsClient;
+            this.basicDigitalTwin = basicDigitalTwin;
         }
 
-        [HttpPost]
-        public async Task<IActionResult> Post([FromBody] List<Motion> motionList)
+        [HttpPost("api/[controller]/init")]
+        public async Task<IActionResult> AdtInit([FromBody] object content)
         {
-            string adtInstanceUrl = "https://" + this.configuration.GetValue<string>("AdtHostName");
+            await DeleteModelRelationshipTwins(this.digitalTwinsClient);
+            await UploadModel(content);
 
-            //try
-            //{
-            //    ManagedIdentityCredential cred = new ManagedIdentityCredential(adtAppId);
-            //    client = new DigitalTwinsClient(new Uri(adtInstanceUrl), cred);
-            //}
-            //catch (Exception e)
-            //{
-            //    Environment.Exit(0);
-            //}
+            Dtdl dtdl = JsonConvert.DeserializeObject<Dtdl>(content.ToString());
+            this.basicDigitalTwin.Id = twinId;
+            this.basicDigitalTwin.Metadata.ModelId = dtdl.Id;
+            this.basicDigitalTwin.Contents.Add("DisplayName", twinDisplayName);
+            for (int i = 0; i < 6; i++)
+            {
+                this.basicDigitalTwin.Contents.Add($"Data{i + 1}", 0);
+            }
+            await WriteDigitalTwins(this.basicDigitalTwin);
 
-            var credential = new DefaultAzureCredential();
-            var client = new DigitalTwinsClient(new Uri(adtInstanceUrl), credential);
+            return Ok(this.basicDigitalTwin);
+        }
 
-            // <Print_model>
-            // Read a list of models back from the service
-            AsyncPageable<DigitalTwinsModelData> modelDataList = client.GetModelsAsync();
+        [HttpPost("api/[controller]/write")]
+        public async Task<IActionResult> AdtWrite([FromBody] List<Motion> motionList)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                basicDigitalTwin.Contents[$"Data{i + 1}"] = motionList[0].Telemetry[i].TagValue;
+            }
+            await WriteDigitalTwins(this.basicDigitalTwin);
+
+            return Ok(this.basicDigitalTwin);
+        }
+
+        [HttpGet("api/[controller]")]
+        public async Task<IActionResult> AdtGet()
+        {
+            string query = "SELECT * FROM digitaltwins";
+            AsyncPageable<BasicDigitalTwin> queryResult = this.digitalTwinsClient.QueryAsync<BasicDigitalTwin>(query);
+            var twinList = new List<BasicDigitalTwin>();
+
+            await foreach (BasicDigitalTwin twin in queryResult)
+            {
+                twinList.Add(twin);
+            }
+            return Created("twinlist", twinList);
+        }
+
+        private async Task DeleteModelRelationshipTwins(DigitalTwinsClient digitalTwinsClient)
+        {
+            AsyncPageable<DigitalTwinsModelData> modelDataList = this.digitalTwinsClient.GetModelsAsync();
             await foreach (DigitalTwinsModelData md in modelDataList)
             {
-                Console.WriteLine($"Model: {md.Id}");
-                await client.DeleteModelAsync(md.Id);
+                await this.digitalTwinsClient.DeleteModelAsync(md.Id);
             }
 
             AsyncPageable<BasicRelationship> relationships;
             AsyncPageable<IncomingRelationship> incomingRels;
 
             string query = "SELECT * FROM digitaltwins";
-            AsyncPageable<BasicDigitalTwin> queryResult = client.QueryAsync<BasicDigitalTwin>(query);
+            AsyncPageable<BasicDigitalTwin> queryResult = this.digitalTwinsClient.QueryAsync<BasicDigitalTwin>(query);
 
             await foreach (BasicDigitalTwin twin in queryResult)
             {
-                relationships = client.GetRelationshipsAsync<BasicRelationship>(twin.Id);
+                relationships = this.digitalTwinsClient.GetRelationshipsAsync<BasicRelationship>(twin.Id);
                 await foreach (BasicRelationship relationship in relationships)
                 {
-                    await client.DeleteRelationshipAsync(twin.Id, relationship.Id);
+                    await this.digitalTwinsClient.DeleteRelationshipAsync(twin.Id, relationship.Id);
                 }
 
-                incomingRels = client.GetIncomingRelationshipsAsync(twin.Id);
+                incomingRels = this.digitalTwinsClient.GetIncomingRelationshipsAsync(twin.Id);
                 await foreach (IncomingRelationship incomingRel in incomingRels)
                 {
-                    await client.DeleteRelationshipAsync(incomingRel.SourceId, incomingRel.RelationshipId);
+                    await this.digitalTwinsClient.DeleteRelationshipAsync(incomingRel.SourceId, incomingRel.RelationshipId);
                 }
 
-                await client.DeleteDigitalTwinAsync(twin.Id);
+                await this.digitalTwinsClient.DeleteDigitalTwinAsync(twin.Id);
             }
+        }
 
-            string dtdl = System.IO.File.ReadAllText("Models/SampleModel.json");
+        private async Task UploadModel(object content)
+        {
+            string dtdl = content.ToString();
             var models = new List<string> { dtdl };
             try
             {
-                await client.CreateModelsAsync(models);
+                await this.digitalTwinsClient.CreateModelsAsync(models);
             }
             catch (RequestFailedException e)
             {
                 Console.WriteLine($"Upload model error: {e.Status}: {e.Message}");
             }
+        }
 
-            // <Print_model>
-            // Read a list of models back from the service
-            modelDataList = client.GetModelsAsync();
-            await foreach (DigitalTwinsModelData md in modelDataList)
-            {
-                Console.WriteLine($"Model: {md.Id}");
-            }
-
-
-            var twinData = new BasicDigitalTwin();
-            twinData.Metadata.ModelId = "dtmi:example:SampleModel;1";
-            twinData.Contents.Add("DisplayName", "SampleDevice");
-            for (int i = 0; i < 6; i++)
-            {
-                twinData.Contents.Add($"Data{i+1}", motionList[0].Telemetry[i].TagValue);
-            }
-            twinData.Id = "sampleTwin";
+        private async Task WriteDigitalTwins(BasicDigitalTwin basicDigitalTwin)
+        {
             try
             {
-                await client.CreateOrReplaceDigitalTwinAsync<BasicDigitalTwin>(twinData.Id, twinData);
+                await digitalTwinsClient.CreateOrReplaceDigitalTwinAsync<BasicDigitalTwin>(this.basicDigitalTwin.Id, this.basicDigitalTwin);
             }
-            catch (RequestFailedException e)
+            catch (Exception e)
             {
-                Console.WriteLine($"Create twin error: {e.Status}: {e.Message}");
+                throw;
             }
-
-            // <Query_twins>
-            // Run a query for all twins
-            query = "SELECT * FROM digitaltwins";
-            queryResult = client.QueryAsync<BasicDigitalTwin>(query);
-
-
-            await foreach (BasicDigitalTwin twin in queryResult)
-            {
-                string js = JsonSerializer.Serialize(twin);
-                Console.WriteLine(js);
-                Console.WriteLine("---------------");
-            }
-
-            return Created("twindata", twinData);
         }
     }
 }

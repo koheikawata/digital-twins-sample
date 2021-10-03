@@ -1,16 +1,12 @@
+using Azure.DigitalTwins.Core;
+using Azure.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpsPolicy;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace AdtManager
 {
@@ -26,6 +22,8 @@ namespace AdtManager
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddSingleton<DigitalTwinsClient>(InitializeDigitalTwinsClient(this.Configuration));
+            services.AddSingleton<BasicDigitalTwin>();
             services.AddControllers();
             services.AddSwaggerGen(c =>
             {
@@ -53,6 +51,16 @@ namespace AdtManager
             {
                 endpoints.MapControllers();
             });
+        }
+
+        private static DigitalTwinsClient InitializeDigitalTwinsClient(IConfiguration configuration)
+        {
+            string adtInstanceUrl = "https://" + configuration.GetValue<string>("AdtHostName");
+
+            var credential = new ChainedTokenCredential(
+                new ManagedIdentityCredential("https://digitaltwins.azure.net"),
+                new DefaultAzureCredential());
+            return new DigitalTwinsClient(new Uri(adtInstanceUrl), credential);
         }
     }
 }
